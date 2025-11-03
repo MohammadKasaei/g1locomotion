@@ -364,3 +364,13 @@ def body_orientation(
     # return torch.acos(-asset.data.projected_gravity_b[:, 2]).abs() > limit_angle
     return torch.acos(-asset.data.projected_gravity_b[:, 2]).abs() 
     
+
+
+
+def walking_time(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Time since locomotion started."""
+    
+    sim_time = env.episode_length_buf.unsqueeze(1) * env.step_dt
+    walking_time = torch.zeros_like(sim_time, device=sim_time.device)  # (num_envs,1)
+
+    return walking_time  # (num_envs,)

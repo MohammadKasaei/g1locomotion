@@ -92,9 +92,9 @@ G1_CFG = ArticulationCfg(
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 0.8),
         joint_pos={
-            ".*_hip_pitch_joint": -0.3,
+            ".*_hip_pitch_joint": -0.25,
             ".*_knee_joint": -0.,
-            ".*_ankle_pitch_joint": -0.3,
+            ".*_ankle_pitch_joint": -0.25,
 
             ".*_elbow_pitch_joint": 1.57,
             "left_shoulder_roll_joint": 0.3,
@@ -232,22 +232,6 @@ class G1LocoSceneCfg(InteractiveSceneCfg):
     # Ground-plane
     terrain = AssetBaseCfg(prim_path="/World/defaultGroundPlane", spawn=sim_utils.GroundPlaneCfg())
     
-    # # add terrain
-    # terrain = TerrainImporterCfg(
-    #     prim_path="/World/ground",
-    #     terrain_type="generator",
-    #     terrain_generator=ROUGH_TERRAINS_CFG,
-    #     max_init_terrain_level=5,
-    #     collision_group=-1,
-    #     physics_material=sim_utils.RigidBodyMaterialCfg(
-    #         friction_combine_mode="multiply",
-    #         restitution_combine_mode="multiply",
-    #         static_friction=1.0,
-    #         dynamic_friction=1.0,
-    #     ),
-    #     debug_vis=False,
-    # )
-
 
     # lights
     dome_light = AssetBaseCfg(
@@ -311,43 +295,6 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], scale=0.5, use_default_offset=True)
 
 
-# def calc_deviate_from_ref(env):
-#     """Return reference joint positions from pretrained locomotion model, using sim time."""
-#     # Get the current simulation time (scalar float or tensor)
-#     global locomotion
-#     if not locomotion:
-#         return torch.zeros(env.num_envs, 12, device=env.device)
-    
-#     sim_time = env.episode_length_buf.unsqueeze(1) * env.step_dt # should already be a tensor or scalar float
-
-#     # Call your pretrained locomotion model without gradients
-#     with torch.no_grad():
-#         pos = locomotion(sim_time)        # (num_envs, num_outputs)
-#         target_pos = pos[:, 10:]          # adjust slice as needed for your model output
-
-#     # return target_pos
-#     # legs  = env.action_manager.action[:,locomotion.joint_order[-12:]] - target_pos
-    
-#     legs  = env.action_manager.action[:,locomotion.legs_idx[:]] - target_pos
-#     arms = env.action_manager.action[:,locomotion.arms_idx[:]] - env.scene["robot"].data.default_joint_pos[:,locomotion.arms_idx[:]]
-#     err = torch.cat([legs, arms], dim=1)
-#     return err
-
-
-# def deviate_from_ref(env: ManagerBasedEnv) -> torch.Tensor:
-#     """Deviation from reference joint positions."""
-#     # joint_pos = env.joint_state_manager.joint_pos_rel  # (num_envs, num_joints)
-#     errs = calc_deviate_from_ref(env)          # (num_envs, num_joints)
-#     return torch.mean(torch.abs(errs), dim=1) #+ 0.1* torch.sum(torch.abs(err_arms), dim=1)  # (num_envs,)
-
-def walking_time(env: ManagerBasedEnv) -> torch.Tensor:
-    """Time since locomotion started."""
-    
-    sim_time = env.episode_length_buf.unsqueeze(1) * env.step_dt
-    walking_time = torch.zeros_like(sim_time,device=sim_time.device) # (num_envs,1)
-                    
-    return walking_time  # (num_envs,)
-
 @configclass
 class ObservationsCfg:
     """Observation specifications for the MDP."""
@@ -368,9 +315,7 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
         joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
         actions   = ObsTerm(func=mdp.last_action)
-        # joint_ref = ObsTerm(func=calc_deviate_from_ref)
-        walking_time = ObsTerm(func=walking_time)
-        # current_time = ObsTerm(func=mdp.current_time_s)
+        walking_time = ObsTerm(func=mdp.walking_time)
         height_scan = ObsTerm(
             func=mdp.height_scan,
             params={"sensor_cfg": SceneEntityCfg("height_scanner")},
@@ -386,19 +331,13 @@ class ObservationsCfg:
     # observation groups
     policy: PolicyCfg = PolicyCfg()
 
-
-# @configclass
-# class EventCfg:
-#     """Configuration for events."""
-#     reset_scene = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
-    
     
 @configclass
 class EventCfg:
     """Configuration for events."""
 
     # startup
-    # reset_scene = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
+    reset_scene = EventTerm(func=mdp.reset_scene_to_default, mode="reset")
 
     # physics_material = EventTerm(
     #     func=mdp.randomize_rigid_body_material,
@@ -480,34 +419,28 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Configuration for rewards."""
-    
+#   track_lin_vel_xy_exp: 2.64722718723776
+#   track_ang_vel_z_exp: 0.8757072184783122
+#   feet_air_time: 0.1856814459918922
+#   feet_slide: -0.1087987299538326
+#   dof_pos_limits: -1.4956807119362252
+#   joint_deviation_hip: -0.27349065334738
+#   joint_deviation_arms: -0.11306600198911727
+#   joint_deviation_torso: -0.13080479722911748
+#   action_rate_l2: -0.01356353150914467
+#   dof_torques_l2: -1.1032243485864228e-05
+#   dof_acc_l2: -3.9570220618377686e-07
+#   flat_orientation_l2: -0.2655244814928903
+
+     
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
     lin_vel_z_l2 = None
     track_lin_vel_xy_exp = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=1.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_lin_vel_xy_exp, weight=2.64722718723776, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
     track_ang_vel_z_exp = RewTerm(
-        func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+        func=mdp.track_ang_vel_z_exp, weight=0.8757072184783122, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
-    
-    # track_lin_vel_xy_exp = RewTerm(
-    #     func=mdp.track_lin_vel_xy_yaw_frame_exp,
-    #     weight=1.5,
-    #     params={"command_name": "base_velocity", "std": 0.5},
-    # )
-    # track_ang_vel_z_exp = RewTerm(
-    #     func=mdp.track_ang_vel_z_world_exp, weight=1.0, params={"command_name": "base_velocity", "std": 0.5}
-    # )
-    
-    # feet_air_time = RewTerm(
-    #     func=mdp.feet_air_time_positive_biped,
-    #     weight=0.05,
-    #     params={
-    #         "command_name": "base_velocity",
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*ankle_roll_link"),
-    #         "threshold": 0.01,
-    #     },
-    # )
     
     # feet_air_time = RewTerm(
     #     func=mdp.feet_air_time,
@@ -521,7 +454,7 @@ class RewardsCfg:
 
     feet_air_time = RewTerm(
         func=mdp.feet_air_time_symetry_biped,
-        weight=0.15,
+        weight=0.1856814459918922,
         params={
             "command_name": "base_velocity",
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*ankle_roll_link"),
@@ -531,7 +464,7 @@ class RewardsCfg:
 
     feet_slide = RewTerm(
         func=mdp.feet_slide,
-        weight=-0.25,
+        weight=-0.1087987299538326,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*ankle_roll_link"),
             "asset_cfg": SceneEntityCfg("robot", body_names=".*ankle_roll_link"),
@@ -547,48 +480,36 @@ class RewardsCfg:
     #     },
     # )
 
-    # deviate_from_ref = RewTerm(func=deviate_from_ref, weight=0.0)
-
     # Penalize ankle joint limits
     dof_pos_limits = RewTerm(
-        func=mdp.joint_pos_limits, weight=-1.0, params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*ankle_pitch_joint", ".*ankle_roll_joint"])}
+        func=mdp.joint_pos_limits,
+        weight=-1.4956807119362252,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*ankle_pitch_joint", ".*ankle_roll_joint"])}
     )
     # Penalize deviation from default of the joints that are not essential for locomotion
     joint_deviation_hip = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.2,
+        weight=-0.27349065334738,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_yaw_.*", ".*_hip_roll_.*"])},
     )
     joint_deviation_arms = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.2,
+        weight=-0.11306600198911727,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder_.*", ".*_elbow_.*"])},
     )
     joint_deviation_torso = RewTerm(
-        func=mdp.joint_deviation_l1, weight=-0.15, params={"asset_cfg": SceneEntityCfg("robot", joint_names=["torso_joint"])}
+        func=mdp.joint_deviation_l1,
+        weight= -0.13080479722911748,
+        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["torso_joint"])}
     )
     
     
-    # # # -- task
-    # track_lin_vel_xy_exp = RewTerm(
-    #     func=mdp.track_lin_vel_xy_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    # )
-    # track_ang_vel_z_exp = RewTerm(
-    #     func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    # )
-    
-    # # -- penalties
-    # termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
-    # alive = RewTerm(func=mdp.is_alive, weight=0.1)
-    # lin_vel_z_l2   = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
-    # ang_vel_xy_l2  = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
-    # lin_acc_l2     = RewTerm(func=mdp.body_lin_acc_l2, weight=0.02)
-    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5)
-    dof_acc_l2     = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight= -0.01356353150914467)
+    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.1032243485864228e-05)
+    dof_acc_l2     = RewTerm(func=mdp.joint_acc_l2, weight=-3.9570220618377686e-07)
     
     # # -- optional penalties
-    flat_orientation_l2 = RewTerm(func=mdp.body_orientation, weight=-0.25, params={"limit_angle": 0.3})
+    flat_orientation_l2 = RewTerm(func=mdp.body_orientation, weight=-0.2655244814928903, params={"limit_angle": 0.3})
     # dof_pos_limits = RewTerm(func=mdp.joint_pos_limits, weight=0.0)
     
     
