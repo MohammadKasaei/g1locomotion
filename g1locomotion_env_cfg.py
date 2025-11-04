@@ -419,15 +419,15 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Configuration for rewards."""
-    # # -- optimized reward weights from optuna tuning
     # # Optuna optimized reward weights:
     #   track_lin_vel_xy_exp: 2.64722718723776
     #   track_ang_vel_z_exp: 0.8757072184783122
+    #   symmetry_joint_motion: 0.10000000000000002
     #   feet_air_time: 0.1856814459918922
     #   feet_slide: -0.1087987299538326
     #   dof_pos_limits: -1.4956807119362252
     #   joint_deviation_hip: -0.27349065334738
-    #   joint_deviation_arms: -0.11306600198911727
+    #   joint_deviation_arms: -0.15306600198911727
     #   joint_deviation_torso: -0.13080479722911748
     #   action_rate_l2: -0.01356353150914467
     #   dof_torques_l2: -1.1032243485864228e-05
@@ -446,7 +446,7 @@ class RewardsCfg:
 
     symmetry = RewTerm(
         func=mdp.symmetry_joint_motion,
-        weight=0.05,
+        weight=0.10000000000000002,
         params={
             "left_cfg":  SceneEntityCfg("robot", joint_names=[
                 "left_hip_yaw_joint",
@@ -503,7 +503,7 @@ class RewardsCfg:
     )
     joint_deviation_arms = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.11306600198911727,
+        weight=-0.15306600198911727,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_shoulder_.*", ".*_elbow_.*"])},
     )
     joint_deviation_torso = RewTerm(
