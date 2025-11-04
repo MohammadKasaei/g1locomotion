@@ -1,6 +1,6 @@
-# G1 Locomotion in IsaacSiM
+# G1 Locomotion in IsaacLab
 
-This repository contains the code for training and evaluating the G1 robot for locomotion tasks using NVIDIA's IsaacSim simulator. The implementation leverages the IsaacGym API for high-performance reinforcement learning.
+This repository contains the code for training and evaluating the G1 robot for locomotion tasks using NVIDIA's IsaacLab simulator. The implementation leverages the IsaacGym API for high-performance reinforcement learning.
 
 ![G1 Locomotion](imgs/locomotion.gif)
 
