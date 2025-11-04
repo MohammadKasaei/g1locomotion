@@ -374,3 +374,61 @@ def walking_time(env: ManagerBasedRLEnv) -> torch.Tensor:
     walking_time = torch.zeros_like(sim_time, device=sim_time.device)  # (num_envs,1)
 
     return walking_time  # (num_envs,)
+
+
+def symmetry_joint_motion(
+    env: ManagerBasedRLEnv,
+    left_cfg: SceneEntityCfg,
+    right_cfg: SceneEntityCfg,
+    mode: str = "position_velocity",
+    mirror_signs: torch.Tensor | None = None,
+) -> torch.Tensor:
+    """
+    Encourage left/right symmetry by comparing corresponding joints on each side, using
+    an explicit per-joint sign vector for mirroring (e.g., [+1, -1, -1, +1, ...]).
+
+    Args:
+        left_cfg: SceneEntityCfg for left joints (ordered list).
+        right_cfg: SceneEntityCfg for right joints (ordered list).
+        mode: "position", "velocity", or "position_velocity".
+        mirror_signs: (n_joints,) tensor of ±1 values defining expected sign relation.
+                      If None, defaults to all -1 (perfect mirror symmetry).
+    """
+    asset: Articulation = env.scene[left_cfg.name]
+    data = asset.data
+
+    left_ids = left_cfg.joint_ids
+    right_ids = right_cfg.joint_ids
+    n = min(len(left_ids), len(right_ids))
+    if n == 0:
+        return torch.zeros(env.num_envs, device=env.device)
+
+    left_ids = left_ids[:n]
+    right_ids = right_ids[:n]
+
+    # prepare signs
+    if mirror_signs is None:
+        mirror_signs = torch.ones(n, device=env.device) * -1.0
+    elif not torch.is_tensor(mirror_signs):
+        mirror_signs = torch.tensor(mirror_signs, device=env.device, dtype=torch.float32)
+    else:
+        mirror_signs = mirror_signs.to(env.device)
+
+    # joint data
+    pos = data.joint_pos
+    vel = data.joint_vel
+
+    # compute errors
+    # for each pair: left_pos ≈ mirror_sign * right_pos
+    pos_err = torch.abs(pos[:, left_ids] - mirror_signs * pos[:, right_ids])
+    vel_err = torch.abs(vel[:, left_ids] - mirror_signs * vel[:, right_ids])
+
+    if mode == "position":
+        rew = -torch.mean(pos_err, dim=1)
+    elif mode == "velocity":
+        rew = -torch.mean(vel_err, dim=1)
+    else:
+        rew = -torch.mean(pos_err + 0.1 * vel_err, dim=1)
+
+    return rew
+

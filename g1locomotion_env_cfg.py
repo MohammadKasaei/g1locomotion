@@ -419,18 +419,20 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Configuration for rewards."""
-#   track_lin_vel_xy_exp: 2.64722718723776
-#   track_ang_vel_z_exp: 0.8757072184783122
-#   feet_air_time: 0.1856814459918922
-#   feet_slide: -0.1087987299538326
-#   dof_pos_limits: -1.4956807119362252
-#   joint_deviation_hip: -0.27349065334738
-#   joint_deviation_arms: -0.11306600198911727
-#   joint_deviation_torso: -0.13080479722911748
-#   action_rate_l2: -0.01356353150914467
-#   dof_torques_l2: -1.1032243485864228e-05
-#   dof_acc_l2: -3.9570220618377686e-07
-#   flat_orientation_l2: -0.2655244814928903
+    # # -- optimized reward weights from optuna tuning
+    # # Optuna optimized reward weights:
+    #   track_lin_vel_xy_exp: 2.64722718723776
+    #   track_ang_vel_z_exp: 0.8757072184783122
+    #   feet_air_time: 0.1856814459918922
+    #   feet_slide: -0.1087987299538326
+    #   dof_pos_limits: -1.4956807119362252
+    #   joint_deviation_hip: -0.27349065334738
+    #   joint_deviation_arms: -0.11306600198911727
+    #   joint_deviation_torso: -0.13080479722911748
+    #   action_rate_l2: -0.01356353150914467
+    #   dof_torques_l2: -1.1032243485864228e-05
+    #   dof_acc_l2: -3.9570220618377686e-07
+    #   flat_orientation_l2: -0.2655244814928903
 
      
     termination_penalty = RewTerm(func=mdp.is_terminated, weight=-200.0)
@@ -441,17 +443,33 @@ class RewardsCfg:
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_exp, weight=0.8757072184783122, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
-    
-    # feet_air_time = RewTerm(
-    #     func=mdp.feet_air_time,
-    #     weight=0.15,
-    #     params={
-    #         "command_name": "base_velocity",
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*ankle_roll_link"),
-    #         "threshold": 0.1,
-    #     },
-    # )
 
+    symmetry = RewTerm(
+        func=mdp.symmetry_joint_motion,
+        weight=0.05,
+        params={
+            "left_cfg":  SceneEntityCfg("robot", joint_names=[
+                "left_hip_yaw_joint",
+                "left_hip_roll_joint",
+                "left_hip_pitch_joint",
+                "left_knee_joint",
+                "left_ankle_pitch_joint",
+                "left_ankle_roll_joint",
+            ]),
+            "right_cfg": SceneEntityCfg("robot", joint_names=[
+                "right_hip_yaw_joint",
+                "right_hip_roll_joint",
+                "right_hip_pitch_joint",
+                "right_knee_joint",
+                "right_ankle_pitch_joint",
+                "right_ankle_roll_joint",
+            ]),
+            # sign convention: +1 means same direction, -1 means mirrored
+            "mirror_signs": [ +1.0, +1.0, -1.0, -1.0, -1.0, +1.0 ],
+            "mode": "position_velocity",
+        },
+    )
+     
     feet_air_time = RewTerm(
         func=mdp.feet_air_time_symetry_biped,
         weight=0.1856814459918922,
@@ -471,15 +489,6 @@ class RewardsCfg:
         },
     )
     
-    # # penalize both feet in the air
-    # both_feet_in_air = RewTerm(
-    #     func=mdp.both_feet_in_air_biped,
-    #     weight=-0.0,
-    #     params={
-    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*ankle_roll_link"),
-    #     },
-    # )
-
     # Penalize ankle joint limits
     dof_pos_limits = RewTerm(
         func=mdp.joint_pos_limits,
