@@ -32,3 +32,11 @@ The optimization script can be found in the `optuna` directory. To run the optim
 python optuna/optimize_rewards.py
 ```
 
+
+# Use multiple GPUs for training
+To leverage multiple GPUs for training the G1 robot, you can use the following command:
+```bash
+python -m torch.distributed.run --nnodes=1 --nproc_per_node=<number_of_gpus>  scripts/reinforcement_learning/rsl_rl/train.py --task Isaac-G1locomotion-v0 --num_envs 4096 --headless --distributed
+```
+
+Replace `<number_of_gpus>` with the number of GPUs you want to use for training.
